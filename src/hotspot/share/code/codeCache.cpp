@@ -208,7 +208,7 @@ void CodeCache::initialize_heaps() {
   const size_t ps             = page_size(false, 8);
   const size_t min_size       = MAX2(os::vm_allocation_granularity(), ps);
   const size_t min_cache_size = CodeCacheMinimumUseSpace DEBUG_ONLY(* 3); // Make sure we have enough space for VM internal code
-  size_t cache_size           = ReservedCodeCacheSize;
+  size_t cache_size           = align_up(ReservedCodeCacheSize, min_size);
 
   // Prerequisites
   if (!heap_available(CodeBlobType::MethodProfiled)) {
