@@ -193,9 +193,9 @@ struct CodeHeapInfo {
   bool enabled;
 };
 
-static void set_size_of_unset_code_heap(CodeHeapInfo* heap, size_t available_size, size_t known_segments_size, size_t min_size) {
+static void set_size_of_unset_code_heap(CodeHeapInfo* heap, size_t available_size, size_t used_size, size_t min_size) {
   assert(!heap->set, "sanity");
-  heap->size = (available_size > known_segments_size + min_size) ? (available_size - known_segments_size) : min_size;
+  heap->size = (available_size > used_size + min_size) ? (available_size - used_size) : min_size;
 }
 
 void CodeCache::initialize_heaps() {
@@ -221,9 +221,7 @@ void CodeCache::initialize_heaps() {
     profiled.enabled = false;
   }
 
-  if (!heap_available(CodeBlobType::MethodNonProfiled)) {
-    assert(false, "MethodNonProfiled heap is always available for segmented code heap");
-  }
+  assert(heap_available(CodeBlobType::MethodNonProfiled), "MethodNonProfiled heap is always available for segmented code heap");
 
   size_t compiler_buffer_size = 0;
   COMPILER1_PRESENT(compiler_buffer_size += CompilationPolicy::c1_count() * Compiler::code_buffer_size());
@@ -271,7 +269,7 @@ void CodeCache::initialize_heaps() {
   if (profiled.enabled) {
     check_min_size("profiled code heap", profiled.size, min_size);
   }
-  if (non_profiled.enabled) {
+  if (non_profiled.enabled) { // non_profiled.enabled is always ON for segmented code heap, leave it checked for clarity
     check_min_size("non-profiled code heap", non_profiled.size, min_size);
   }
   if (cache_size_set) {
@@ -304,15 +302,13 @@ void CodeCache::initialize_heaps() {
     }
   }
 
-  // last adjustment: leftovers from page alignment go to non_nmethod segment
-  non_nmethod.size += non_profiled.size & alignment_mask(min_size);
-  non_nmethod.size += profiled.size & alignment_mask(min_size);
-
   // Note: if large page support is enabled, min_size is at least the large
   // page size. This ensures that the code cache is covered by large pages.
-  non_nmethod.size = align_up(non_nmethod.size, min_size);
-  non_profiled.size = align_down(non_profiled.size, min_size);
+  non_profiled.size += non_nmethod.size & alignment_mask(min_size);
+  non_profiled.size += profiled.size & alignment_mask(min_size);
+  non_nmethod.size = align_down(non_nmethod.size, min_size);
   profiled.size = align_down(profiled.size, min_size);
+  non_profiled.size = align_down(non_profiled.size, min_size);
 
   FLAG_SET_ERGO(NonNMethodCodeHeapSize, non_nmethod.size);
   FLAG_SET_ERGO(ProfiledCodeHeapSize, profiled.size);
